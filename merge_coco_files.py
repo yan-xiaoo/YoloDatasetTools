@@ -6,6 +6,7 @@
 from pycocotools import coco
 import json
 import os
+import copy
 
 
 """
@@ -38,7 +39,7 @@ class Config:
 # 例如：Config('C:/a', ['C:/b/coco_file_b.json', 'C:/a/coco_file_a.json'], 'C:/a/output.json')
 # 会将 C:/a 下的所有coco文件和 C:/b/coco_file_b.json 中的所有coco文件合并
 # 输出到 C:/a/output.json
-DEFAULT_CONFIG = Config("/Users/liyanxiao/Desktop/西安交大/RoboMaster/blue_mid_pic/", None, "/Users/liyanxiao/Desktop/西安交大/RoboMaster/数据集管理脚本/merge.json")
+DEFAULT_CONFIG = Config("/Users/liyanxiao/Desktop/西安交大/RoboMaster/new", None, "/Users/liyanxiao/Desktop/西安交大/RoboMaster/new/output.json")
 
 
 class MergeError(Exception):
@@ -222,7 +223,20 @@ def merge_two_coco_file(main_coco:str, merge_coco:str, allow_repeat:bool=True, a
     return output
 
 
-def change_category_id(dataset:coco.COCO, old_id:int, new_id:int):
+def find_with_name(dataset:coco.COCO, name:str):
+    """
+    在dataset中查找名称为name的类别
+    :param dataset: coco.COCO对象
+    :param name: 要查找的类别名称
+    :return: 如果找到，返回类别，否则返回None
+    """
+    for category in dataset.dataset['categories']:
+        if category['name'] == name:
+            return category
+    return None
+
+
+def change_category_id(dataset:coco.COCO, old_id:int, new_id:int, cache:coco.COCO=None):
     """
     将dataset中所有category_id为old_id更新为new_id
     :param dataset: coco.COCO对象
@@ -231,12 +245,20 @@ def change_category_id(dataset:coco.COCO, old_id:int, new_id:int):
     :return: None
     """
     for annotation in dataset.dataset['annotations']:
-        if annotation['category_id'] == old_id:
-            annotation['category_id'] = new_id
+        if cache is not None:
+            if cache.anns[annotation['id']]['category_id'] == old_id:
+                annotation['category_id'] = new_id
+        else:
+            if annotation['category_id'] == old_id:
+                annotation['category_id'] = new_id
     
     for category in dataset.dataset['categories']:
-        if category['id'] == old_id:
-            category['id'] = new_id
+        if cache is not None:
+            if find_with_name(cache, category['name'])['id'] == old_id:
+                category['id'] = new_id
+        else:
+            if category['id'] == old_id:
+                category['id'] = new_id
     dataset.createIndex()
 
 
@@ -315,44 +337,55 @@ def console_main():
 
         try:
             result = merge_two_coco_file(result, coco_file, allow_category_merge=False, allow_repeat=True)
-        except* CategoryNotFoundError as e:
-            for error in e.exceptions:
-                print(f" {error.args[1]} 这个标签没有在之前的文件中出现过。")
-                print(f"之前文件中存在的标签如下：{error.args[2]}")
-                choice = _ask_until_answers(lambda ans: ans in ['0','1'],f"该标签是否与之前文件中的某个标签相同？(1/0): ")
-                if choice == '0':
-                    choice2 = _ask_until_answers(lambda ans: ans in ['0','1'], f"是否将其作为新的标签添加至合并后的文件中(1/0): ")
-                    if choice2 == '1':
-                        allow_category_merge = True
-                    else:
-                        delete_category(coco_file, error.args[1]['id'])
+        except* MergeError:
+            stay = True
+            allow_category_merge = False
+            while stay:
+                try:
+                    result = merge_two_coco_file(result, coco_file, allow_category_merge=allow_category_merge, allow_repeat=True)
+                except* CategoryNotFoundError as e:
+                    backup = coco.COCO()
+                    backup.dataset = copy.deepcopy(coco_file.dataset)
+                    backup.createIndex()
+                    for error in e.exceptions:
+                        print(f" {error.args[1]} 这个标签没有在之前的文件中出现过。")
+                        print(f"之前文件中存在的标签如下：{error.args[2]}")
+                        choice = _ask_until_answers(lambda ans: ans in ['0','1'],f"该标签是否与之前文件中的某个标签相同？(1/0): ")
+                        if choice == '0':
+                            choice2 = _ask_until_answers(lambda ans: ans in ['0','1'], f"是否将其作为新的标签添加至合并后的文件中(1/0): ")
+                            if choice2 == '1':
+                                allow_category_merge = True
+                            else:
+                                delete_category(coco_file, error.args[1]['id'])
+                        else:
+                            print("这个标签与以下哪个标签相同？")
+                            for one_annotation in result.cats.values():
+                                print(f"{one_annotation['id']}: {one_annotation['name']}")
+                            choice3 = _ask_until_answers(lambda ans: ans in [str(one_annotation['id']) for one_annotation in result.cats.values()], "请输入标签id: ")
+                            for one in coco_file.dataset['categories']:
+                                if one['id'] == int(choice3):
+                                    one['name'] = error.args[2][int(choice3)]['name']
+                            change_category_id(coco_file, error.args[1]['id'], int(choice3), backup)
+                except* CategoryRepeatError as e:
+                    backup = coco.COCO()
+                    backup.dataset = copy.deepcopy(coco_file.dataset)
+                    backup.createIndex()
+                    for error in e.exceptions:
+                        print(f" {error.args[2]} 这个标签在之前的文件中出现过，但id不同")
+                        print(f"之前文件中存在的标签如下：{error.args[1]}")
+                        choice = _ask_until_answers(lambda ans: ans in ['0','1'],f"是否认为这两个标签是相同的？(1/0): ")
+                        if choice == '1':
+                            change_category_id(coco_file, error.args[2]['id'], error.args[1]['id'], backup)
+                        else:
+                            choice = input(f"请为该标签 {error.args[2]} 修改名称： ")
+                            coco_file.dataset['categories'][error.args[2]['id']-1]['name'] = choice
+                    allow_category_merge = True
                 else:
-                    print("这个标签与以下哪个标签相同？")
-                    for one_annotation in result.cats.values():
-                        print(f"{one_annotation['id']}: {one_annotation['name']}")
-                    choice3 = _ask_until_answers(lambda ans: ans in [str(one_annotation['id']) for one_annotation in result.cats.values()], "请输入标签id: ")
-                    for one in coco_file.dataset['categories']:
-                        if one['id'] == int(choice3):
-                            one['name'] = error.args[2][int(choice3)]['name']
-                    change_category_id(coco_file, error.args[1]['id'], int(choice3))
-        except* CategoryRepeatError as e:
-            for error in e.exceptions:
-                print(f" {error.args[2]} 这个标签在之前的文件中出现过，但id不同")
-                print(f"之前文件中存在的标签如下：{error.args[1]}")
-                choice = _ask_until_answers(lambda ans: ans in ['0','1'],f"是否认为这两个标签是相同的？(1/0): ")
-                if choice == '1':
-                    change_category_id(coco_file, error.args[2]['id'], error.args[1]['id'])
-                else:
-                    choice = input(f"请为该标签 {error.args[2]} 修改名称： ")
-                    coco_file.dataset['categories'][error.args[2]['id']-1]['name'] = choice
-            allow_category_merge = True
-        else:
-            continue
-        
-        finally: 
+                    stay = False
+                print("完成一轮")
+        finally:
             with open(config.OUTPUT_PATH, 'w') as f:
                 json.dump(result.dataset, f, indent=4, ensure_ascii=False)
-        result = merge_two_coco_file(result, coco_file, allow_category_merge=allow_category_merge, allow_repeat=True)
         
 
 
