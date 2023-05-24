@@ -53,8 +53,7 @@ class Config:
 # 例如：Config('C:/a', ['C:/b/coco_file_b.json', 'C:/a/coco_file_a.json'], 'C:/a/output.json')
 # 会将 C:/a 下的所有coco文件和 C:/b/coco_file_b.json 中的所有coco文件合并
 # 输出到 C:/a/output.json
-DEFAULT_CONFIG = Config(None, ["/Users/liyanxiao/Desktop/西安交大/RoboMaster/armor/train_coco.json",
-                               "/Users/liyanxiao/Desktop/西安交大/RoboMaster/sb_2/train_renamed/train.json"], "/Users/liyanxiao/Desktop/西安交大/RoboMaster/new/fuck.json")
+DEFAULT_CONFIG = Config("/Users/liyanxiao/Desktop/西安交大/RoboMaster/符/wmR_交大隔着铁丝网拍的", None, "/Users/liyanxiao/Desktop/西安交大/RoboMaster/符/wmR_交大隔着铁丝网拍的/dataset.json")
 
 
 def merge_coco_files(config:Config = DEFAULT_CONFIG):
@@ -181,7 +180,8 @@ def merge_two_coco_file(main_coco:str, merge_coco:str, allow_category_merge:bool
                     repeat = True
         if repeat:
             continue
-        image_id = len(output.dataset["images"]) + 1
+        image_ids = [image_data["id"] for image_data in output.dataset["images"]]
+        image_id = max(image_ids) + 1
         image_id_table[image_data["id"]] = image_id
         image_data["id"] = image_id
         output.dataset["images"].append(image_data)
@@ -189,7 +189,8 @@ def merge_two_coco_file(main_coco:str, merge_coco:str, allow_category_merge:bool
     # 合并annotations部分
     output.dataset['annotations'] = main_file.dataset['annotations']
     for annotation in merge_file.anns.values():
-        annotation["id"] = len(output.dataset["annotations"]) + 1
+        annotations_ids = [annotation["id"] for annotation in output.dataset["annotations"]]
+        annotation["id"] = max(annotations_ids) + 1
         # 如果此处出现KeyError, 说明merge_file中image_id对应的图片和main_file中的重复了
         # 因此该图片没有被加入output中
         # 所以有关它的所有标注都应当舍弃

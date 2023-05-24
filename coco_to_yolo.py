@@ -118,7 +118,8 @@ def load_coco(anno_file, xml_save_path):
             obj.extend(segmentation)
             objs.append(obj)
         info['objects'] = objs
-        save_anno_to_txt(info, xml_save_path)
+        if len(objs) > 0:
+            save_anno_to_txt(info, xml_save_path)
 
 
 def parseJsonFile(json_path, txt_save_path):

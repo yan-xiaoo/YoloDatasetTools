@@ -19,9 +19,9 @@
 # 需要安装 pycocotools
 # pip install pycocotools
 
-COCO_FILE_PATH = "/Users/liyanxiao/Desktop/西安交大/RoboMaster/高云天做的东西/labels_my-project-name_2023-05-15-02-13-16.json"
-IMAGE_PATH = "/Users/liyanxiao/Desktop/西安交大/RoboMaster/高云天做的东西/energy"
-OUTPUT_PATH = "/Users/liyanxiao/Desktop/西安交大/RoboMaster/高云天做的东西/yolo_dataset"
+COCO_FILE_PATH = "/Users/liyanxiao/Desktop/西安交大/RoboMaster/符/temp3/dataset_val.json"
+IMAGE_PATH = "/Users/liyanxiao/Desktop/西安交大/RoboMaster/符/temp3/images"
+OUTPUT_PATH = "/Users/liyanxiao/Desktop/西安交大/RoboMaster/符/temp3/yolo_val"
 
 
 import os
@@ -65,7 +65,7 @@ def find_files_in_path(files:list, path:str) -> list:
 
 def main():
     coco_file = coco.COCO(COCO_FILE_PATH)
-    file_names = [img['file_name'] for img in coco_file.imgs.values()]
+    file_names = [img['file_name'] for img in coco_file.dataset['images']]
     full_path = find_files_in_path(file_names, IMAGE_PATH)
     choice = None
 
@@ -82,7 +82,8 @@ def main():
 
     for path in range(len(full_path)):
         if choice  == '1':
-            copyfile(full_path[path], os.path.join(OUTPUT_PATH, "images", file_names[path]))
+            if full_path[path] is not None:
+                copyfile(full_path[path], os.path.join(OUTPUT_PATH, "images", file_names[path]))
         else:
             move(full_path[path], os.path.join(OUTPUT_PATH, "images", file_names[path]))
 

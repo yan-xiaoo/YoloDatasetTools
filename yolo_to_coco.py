@@ -11,9 +11,9 @@
 # pip install tqdm
 
 
-YOLO_LABELS_DIRECTORY = "/Users/liyanxiao/Desktop/西安交大/RoboMaster/windmill/energyTrain_yolo/labels"
-YOLO_IMAGES_DIRECTORY = "/Users/liyanxiao/Desktop/西安交大/RoboMaster/windmill/energyTrain_yolo/images"
-COCO_PATH = "/Users/liyanxiao/Desktop/西安交大/RoboMaster/windmill/energyTrain_yolo/coco.json"
+YOLO_LABELS_DIRECTORY = "/Users/liyanxiao/Desktop/西安交大/RoboMaster/符/temp1/red_yolo_train/labels"
+YOLO_IMAGES_DIRECTORY = "/Users/liyanxiao/Desktop/西安交大/RoboMaster/符/temp1/red_yolo_train/images"
+COCO_PATH = "/Users/liyanxiao/Desktop/西安交大/RoboMaster/符/temp1/red_yolo_train/red_yolo_train.json"
 CLASS_PATH = None
 
 
@@ -45,7 +45,8 @@ def get_images(image_directory):
     image_paths = [os.path.join(image_directory, file_name) for file_name in os.listdir(image_directory)]
     images = []
     name_to_image_id = {}
-    for image_id, image_path in tqdm(enumerate(image_paths), "生成图片信息中"):
+    for image_id in tqdm(range(len(image_paths)), "生成图片信息中"):
+        image_path = image_paths[image_id]
         name_to_image_id[os.path.basename(image_path).split('.')[0]] = image_id+1
         images.append(get_image(image_path, image_id+1))
     return images, name_to_image_id
@@ -88,11 +89,13 @@ def get_annotations(label_directory, image_directory, name_to_image_id):
     for label_path in tqdm(paths, "生成标签中"):
         image_path = os.path.basename(label_path).split('.')[0]
         for image in os.listdir(image_directory):
-            if image_path in image:
+            if image_path == os.path.basename(image).split('.')[0]:
                 suffix = image.split('.')[-1]
+                break
         width, height = get_size(label_path.replace("labels", "images").replace("txt", suffix))
-        annotations.extend(get_annotation(label_path, name_to_image_id, annotation_id, width, height))
-        annotation_id += len(annotations)
+        annos = get_annotation(label_path, name_to_image_id, annotation_id, width, height)
+        annotation_id += len(annos)
+        annotations.extend(annos)
     return annotations
 
 
