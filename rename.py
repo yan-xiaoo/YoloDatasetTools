@@ -1,6 +1,7 @@
 from pycocotools import coco
 import os
 import json
+from clean_coco import clean_ip
 from shutil import copyfile
 
 
@@ -60,6 +61,7 @@ def rename_from_number(coco_file, directory, number, number_of_zeros, output_pat
         rename(image_path_old_to_new[os.path.join(directory, image)], os.path.join(directory, template.format(number)+"."+suffix))
         image_old_to_new[image] = template.format(number)+"."+suffix
         number += 1
+    clean_ip(coco_data)
     for one_image in coco_data.dataset['images']:
         one_image['file_name'] = image_old_to_new[one_image['file_name']]
     if output_path is None:
